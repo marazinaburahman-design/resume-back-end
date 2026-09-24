@@ -56,7 +56,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// ✅ NEW: Explicit OPTIONS handler for preflight
+// ✅ Explicit OPTIONS handler for preflight
 app.options('*', cors(corsOptions));
 
 /* =========================================================
@@ -125,6 +125,7 @@ const apiLimiter = rateLimit({
   ),
   standardHeaders: "draft-7",
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS', // ✅ Skip OPTIONS
   message: {
     message:
       "Too many API requests. Please try again later.",
@@ -140,6 +141,7 @@ const authLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   skipSuccessfulRequests: true,
+  skip: (req) => req.method === 'OPTIONS', // ✅ Skip OPTIONS
   message: {
     message:
       "Too many failed authentication attempts. Please try again later.",
@@ -154,6 +156,7 @@ const analysesLimiter = rateLimit({
   ),
   standardHeaders: "draft-7",
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS', // ✅ Skip OPTIONS
   message: {
     message:
       "Too many resume analysis requests. Please try again later.",
