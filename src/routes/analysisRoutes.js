@@ -1,14 +1,28 @@
-const express=require("express");
-const protect=require("../middleware/authMiddleware");
-const upload=require("../middleware/uploadMiddleware");
-const {createAnalysis,getAnalyses,getAnalysisById,deleteAnalysis}=require("../controllers/analysisController");
+const express = require("express");
+const { analyzeResume } = require("../services/aiService");
 
-const router=express.Router();
-router.use(protect);
+const router = express.Router();
 
-router.post("/",upload.single("resume"),createAnalysis);
-router.get("/",getAnalyses);
-router.get("/:id",getAnalysisById);
-router.delete("/:id",deleteAnalysis);
+router.post("/", async (req, res) => {
+  try {
+    // Accept resume text directly (skip PDF extraction)
+    const { resumeText, jobTitle } = req.body;
 
-module.exports=router;
+    if (!resumeText || !jobTitle) {
+      return res.status(400).json({
+        message: "resumeText and jobTitle are required",
+      });
+    }
+
+    const analysis = await analyzeResume({ 
+      resumeText: resumeText.trim(), 
+      jobTitle 
+    });
+
+    res.json(analysis);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+module.exports = router;
