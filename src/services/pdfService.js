@@ -2,7 +2,10 @@ const pdfjs = require("pdfjs-dist/legacy/build/pdf");
 
 async function extractTextFromPdf(buffer) {
   try {
-    const pdf = await pdfjs.getDocument({ data: buffer }).promise;
+    // Convert Buffer to Uint8Array
+    const uint8Array = new Uint8Array(buffer);
+
+    const pdf = await pdfjs.getDocument({ data: uint8Array }).promise;
     let fullText = "";
 
     for (let i = 1; i <= pdf.numPages; i++) {
