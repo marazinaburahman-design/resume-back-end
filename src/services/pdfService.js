@@ -1,11 +1,10 @@
-const pdfParse = require("pdfjs-dist/legacy/build/pdf");
+const pdfjs = require("pdfjs-dist");
 
 async function extractTextFromPdf(buffer) {
   try {
-    // Set the worker source to CDN version
-    pdfParse.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfParse.version}/pdf.worker.min.js`;
+    pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
-    const pdf = await pdfParse.getDocument({ data: buffer }).promise;
+    const pdf = await pdfjs.getDocument({ data: buffer }).promise;
     let fullText = "";
 
     for (let i = 1; i <= pdf.numPages; i++) {
