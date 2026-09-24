@@ -25,30 +25,19 @@ function buildMockAnalysis(resumeText, jobTitle) {
   ];
 
   const skillsFound = dictionary.filter((skill) =>
-    lower.includes(skill.toLowerCase())
+    lower.includes(skill.toLowerCase()),
   );
 
-  const targetSkills = [
-    "javascript",
-    "react",
-    "node.js",
-    "express",
-    "mongodb",
-  ];
+  const targetSkills = ["javascript", "react", "node.js", "express", "mongodb"];
 
   const missingSkills = targetSkills.filter(
     (skill) =>
-      !skillsFound.some(
-        (found) => found.toLowerCase() === skill.toLowerCase()
-      )
+      !skillsFound.some((found) => found.toLowerCase() === skill.toLowerCase()),
   );
 
   const score = Math.max(
     35,
-    Math.min(
-      95,
-      50 + skillsFound.length * 8 - missingSkills.length * 2
-    )
+    Math.min(95, 50 + skillsFound.length * 8 - missingSkills.length * 2),
   );
 
   return aiAnalysisSchema.parse({
@@ -68,13 +57,14 @@ function buildMockAnalysis(resumeText, jobTitle) {
 
 async function analyzeWithGroq(resumeText, jobTitle) {
   if (!process.env.GROQ_API_KEY) {
-    throw new Error(
-      "GROQ_API_KEY is missing. Add it to your .env file."
-    );
+    throw new Error("GROQ_API_KEY is missing. Add it to your .env file.");
   }
 
-  const model =
-    process.env.AI_MODEL || "openai/gpt-oss-120b";
+  const model = process.env.AI_MODEL;
+
+  if (!model) {
+    throw new Error("AI_MODEL is missing. Add it to your .env file.");
+  }
 
   const trimmedResume = resumeText.slice(0, 30000);
 
@@ -142,7 +132,7 @@ ${trimmedResume}
           },
         ],
       }),
-    }
+    },
   );
 
   const body = await response.json();
@@ -155,13 +145,10 @@ ${trimmedResume}
     throw new Error(message);
   }
 
-  const content =
-    body?.choices?.[0]?.message?.content;
+  const content = body?.choices?.[0]?.message?.content;
 
   if (!content) {
-    throw new Error(
-      "Groq returned an empty AI response."
-    );
+    throw new Error("Groq returned an empty AI response.");
   }
 
   let parsed;
@@ -169,47 +156,29 @@ ${trimmedResume}
   try {
     parsed = JSON.parse(content);
   } catch (error) {
-    console.error(
-      "Invalid Groq JSON:",
-      content
-    );
+    console.error("Invalid Groq JSON:", content);
 
-    throw new Error(
-      "Groq returned invalid JSON for the resume analysis."
-    );
+    throw new Error("Groq returned invalid JSON for the resume analysis.");
   }
 
   return aiAnalysisSchema.parse(parsed);
 }
 
-async function analyzeResume({
-  resumeText,
-  jobTitle,
-}) {
-  const provider = (
-    process.env.AI_PROVIDER || "mock"
-  ).toLowerCase();
+async function analyzeResume({ resumeText, jobTitle }) {
+  const provider = (process.env.AI_PROVIDER || "mock").toLowerCase();
 
-  console.log(
-    `AI provider: ${provider}`
-  );
+  console.log(`AI provider: ${provider}`);
 
   if (provider === "mock") {
-    return buildMockAnalysis(
-      resumeText,
-      jobTitle
-    );
+    return buildMockAnalysis(resumeText, jobTitle);
   }
 
   if (provider === "groq") {
-    return analyzeWithGroq(
-      resumeText,
-      jobTitle
-    );
+    return analyzeWithGroq(resumeText, jobTitle);
   }
 
   throw new Error(
-    `AI provider "${provider}" is not implemented. Use AI_PROVIDER=groq or AI_PROVIDER=mock.`
+    `AI provider "${provider}" is not implemented. Use AI_PROVIDER=groq or AI_PROVIDER=mock.`,
   );
 }
 
