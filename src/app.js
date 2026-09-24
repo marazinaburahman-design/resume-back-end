@@ -43,27 +43,21 @@ if (
   allowedOrigins.push(process.env.CLIENT_URL);
 }
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) {
-        return callback(null, true);
-      }
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.log("CORS blocked origin:", origin);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+};
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+app.use(cors(corsOptions));
 
-      console.log("CORS blocked origin:", origin);
-
-      return callback(
-        new Error(`CORS blocked for origin: ${origin}`)
-      );
-    },
-
-    credentials: true,
-  })
-);
+// ✅ NEW: Explicit OPTIONS handler for preflight
+app.options('*', cors(corsOptions));
 
 /* =========================================================
    BODY PARSING (FIX #2: Increase limit for PDFs)
@@ -73,14 +67,14 @@ const maxFileSize = process.env.MAX_FILE_SIZE_MB || 5;
 
 app.use(
   express.json({
-    limit: `${maxFileSize}mb`, // ✅ Changed from "1mb"
+    limit: `${maxFileSize}mb`,
   })
 );
 
 app.use(
   express.urlencoded({
     extended: true,
-    limit: `${maxFileSize}mb`, // ✅ Added limit
+    limit: `${maxFileSize}mb`,
   })
 );
 
@@ -114,7 +108,7 @@ app.get("/", (req, res) => {
   res.status(200).json({
     message: "ResumeAI API is running",
     environment: isDevelopment ? "development" : "production",
-    model: process.env.AI_MODEL, // ✅ Show active model
+    model: process.env.AI_MODEL,
     provider: process.env.AI_PROVIDER,
   });
 });
@@ -125,15 +119,12 @@ app.get("/", (req, res) => {
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-
   limit: Number(
     process.env.API_RATE_LIMIT ||
       (isDevelopment ? 1000 : 100)
   ),
-
   standardHeaders: "draft-7",
   legacyHeaders: false,
-
   message: {
     message:
       "Too many API requests. Please try again later.",
@@ -142,35 +133,27 @@ const apiLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-
   limit: Number(
     process.env.AUTH_RATE_LIMIT ||
       (isDevelopment ? 100 : 20)
   ),
-
   standardHeaders: "draft-7",
   legacyHeaders: false,
-
   skipSuccessfulRequests: true,
-
   message: {
     message:
       "Too many failed authentication attempts. Please try again later.",
   },
 });
 
-/* ✅ NEW: Analyses rate limiter (prevent abuse) */
 const analysesLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-
+  windowMs: 60 * 60 * 1000,
   limit: Number(
     process.env.ANALYSES_RATE_LIMIT ||
       (isDevelopment ? 50 : 10)
   ),
-
   standardHeaders: "draft-7",
   legacyHeaders: false,
-
   message: {
     message:
       "Too many resume analysis requests. Please try again later.",
@@ -198,13 +181,13 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth", authRoutes);
 
 /* =========================================================
-   ANALYSIS ROUTES (✅ NEW: with rate limiter)
+   ANALYSIS ROUTES
 ========================================================= */
 
 app.use("/api/analyses", analysesLimiter, analysisRoutes);
 
 /* =========================================================
-   ✅ REQUEST LOGGING (for debugging)
+   REQUEST LOGGING
 ========================================================= */
 
 if (isDevelopment) {
