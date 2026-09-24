@@ -6,12 +6,17 @@ const rateLimit = require("express-rate-limit");
 const authRoutes = require("./routes/authRoutes");
 const analysisRoutes = require("./routes/analysisRoutes");
 const healthRoutes = require("./routes/healthRoutes");
+
 const {
   notFound,
   errorHandler,
 } = require("./middleware/errorMiddleware");
 
 const app = express();
+
+/* =========================================================
+   ENVIRONMENT
+========================================================= */
 
 const isDevelopment =
   (process.env.NODE_ENV || "development") !== "production";
@@ -20,26 +25,67 @@ const isDevelopment =
    CORS
 ========================================================= */
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://resume-front-end-ebon.vercel.app",
+];
+
+/*
+ * Also allow CLIENT_URL from Vercel if it is configured.
+ * This lets you change the frontend URL without changing code.
+ */
+if (
+  process.env.CLIENT_URL &&
+  !allowedOrigins.includes(process.env.CLIENT_URL)
+) {
+  allowedOrigins.push(process.env.CLIENT_URL);
+}
+
 app.use(
   cors({
-    origin:
-      process.env.CLIENT_URL ||
-      "https://resume-front-end-ebon.vercel.app",
+    origin: function (origin, callback) {
+      /*
+       * Requests without an Origin header can happen from
+       * tools such as Postman or server-to-server requests.
+       */
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.log("CORS blocked origin:", origin);
+
+      return callback(
+        new Error(`CORS blocked for origin: ${origin}`)
+      );
+    },
+
     credentials: true,
   })
 );
 
 /* =========================================================
-   MIDDLEWARE
+   BODY PARSING
 ========================================================= */
 
-app.use(express.json({ limit: "1mb" }));
+app.use(
+  express.json({
+    limit: "1mb",
+  })
+);
 
 app.use(
   express.urlencoded({
     extended: true,
   })
 );
+
+/* =========================================================
+   COOKIE PARSER
+========================================================= */
 
 app.use(cookieParser());
 
@@ -50,7 +96,9 @@ app.use(cookieParser());
 app.get("/", (req, res) => {
   res.status(200).json({
     message: "ResumeAI API is running",
-    environment: isDevelopment ? "development" : "production",
+    environment: isDevelopment
+      ? "development"
+      : "production",
   });
 });
 
@@ -86,6 +134,9 @@ const authLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
 
+  /*
+   * Only count failed authentication attempts.
+   */
   skipSuccessfulRequests: true,
 
   message: {
@@ -101,32 +152,47 @@ const authLimiter = rateLimit({
 app.use("/api", apiLimiter);
 
 /* =========================================================
-   HEALTH
+   HEALTH ROUTES
 ========================================================= */
 
 app.use("/api/health", healthRoutes);
 
 /* =========================================================
-   AUTH
+   AUTH ROUTES
 ========================================================= */
 
+/*
+ * Rate-limit registration.
+ */
 app.use(
   "/api/auth/register",
   authLimiter
 );
 
+/*
+ * Rate-limit login.
+ */
 app.use(
   "/api/auth/login",
   authLimiter
 );
 
+/*
+ * Main authentication routes.
+ *
+ * Expected endpoints:
+ *
+ * POST /api/auth/register
+ * POST /api/auth/login
+ * GET  /api/auth/me
+ */
 app.use(
   "/api/auth",
   authRoutes
 );
 
 /* =========================================================
-   ANALYSIS
+   ANALYSIS ROUTES
 ========================================================= */
 
 app.use(
@@ -135,7 +201,7 @@ app.use(
 );
 
 /* =========================================================
-   404
+   404 HANDLER
 ========================================================= */
 
 app.use(notFound);
@@ -145,5 +211,9 @@ app.use(notFound);
 ========================================================= */
 
 app.use(errorHandler);
+
+/* =========================================================
+   EXPORT
+========================================================= */
 
 module.exports = app;
