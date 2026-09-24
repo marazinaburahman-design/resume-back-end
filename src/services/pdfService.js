@@ -1,8 +1,9 @@
-const pdfjs = require("pdfjs-dist");
+const pdfjs = require("pdfjs-dist/legacy/build/pdf");
 
 async function extractTextFromPdf(buffer) {
   try {
-    pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+    // Use the built-in worker (no CDN needed)
+    pdfjs.GlobalWorkerOptions.workerSrc = require("pdfjs-dist/build/pdf.worker");
 
     const pdf = await pdfjs.getDocument({ data: buffer }).promise;
     let fullText = "";
@@ -11,7 +12,9 @@ async function extractTextFromPdf(buffer) {
       try {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item) => item.str).join(" ");
+        const pageText = textContent.items
+          .map((item) => item.str)
+          .join(" ");
         fullText += pageText + "\n";
       } catch (error) {
         console.error(`Error on page ${i}:`, error.message);
