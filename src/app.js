@@ -22,6 +22,12 @@ const isDevelopment =
   (process.env.NODE_ENV || "development") !== "production";
 
 /* =========================================================
+   ✅ TRUST PROXY (FIX #1: X-Forwarded-For Error)
+========================================================= */
+
+app.set('trust proxy', process.env.TRUST_PROXY || 1);
+
+/* =========================================================
    CORS
 ========================================================= */
 
@@ -30,10 +36,6 @@ const allowedOrigins = [
   "https://resume-front-end-ebon.vercel.app",
 ];
 
-/*
- * Also allow CLIENT_URL from Vercel if it is configured.
- * This lets you change the frontend URL without changing code.
- */
 if (
   process.env.CLIENT_URL &&
   !allowedOrigins.includes(process.env.CLIENT_URL)
@@ -44,10 +46,6 @@ if (
 app.use(
   cors({
     origin: function (origin, callback) {
-      /*
-       * Requests without an Origin header can happen from
-       * tools such as Postman or server-to-server requests.
-       */
       if (!origin) {
         return callback(null, true);
       }
@@ -68,18 +66,21 @@ app.use(
 );
 
 /* =========================================================
-   BODY PARSING
+   BODY PARSING (FIX #2: Increase limit for PDFs)
 ========================================================= */
+
+const maxFileSize = process.env.MAX_FILE_SIZE_MB || 5;
 
 app.use(
   express.json({
-    limit: "1mb",
+    limit: `${maxFileSize}mb`, // ✅ Changed from "1mb"
   })
 );
 
 app.use(
   express.urlencoded({
     extended: true,
+    limit: `${maxFileSize}mb`, // ✅ Added limit
   })
 );
 
@@ -90,15 +91,31 @@ app.use(
 app.use(cookieParser());
 
 /* =========================================================
+   ✅ TIMEOUT MIDDLEWARE (FIX #3: Request Timeouts)
+========================================================= */
+
+app.use((req, res, next) => {
+  const requestTimeout = parseInt(process.env.REQUEST_TIMEOUT) || 30000;
+  const socketTimeout = parseInt(process.env.SOCKET_TIMEOUT) || 35000;
+
+  req.setTimeout(requestTimeout);
+  res.setTimeout(requestTimeout);
+
+  req.socket.setTimeout(socketTimeout);
+
+  next();
+});
+
+/* =========================================================
    ROOT ROUTE
 ========================================================= */
 
 app.get("/", (req, res) => {
   res.status(200).json({
     message: "ResumeAI API is running",
-    environment: isDevelopment
-      ? "development"
-      : "production",
+    environment: isDevelopment ? "development" : "production",
+    model: process.env.AI_MODEL, // ✅ Show active model
+    provider: process.env.AI_PROVIDER,
   });
 });
 
@@ -134,14 +151,29 @@ const authLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
 
-  /*
-   * Only count failed authentication attempts.
-   */
   skipSuccessfulRequests: true,
 
   message: {
     message:
       "Too many failed authentication attempts. Please try again later.",
+  },
+});
+
+/* ✅ NEW: Analyses rate limiter (prevent abuse) */
+const analysesLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+
+  limit: Number(
+    process.env.ANALYSES_RATE_LIMIT ||
+      (isDevelopment ? 50 : 10)
+  ),
+
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+
+  message: {
+    message:
+      "Too many resume analysis requests. Please try again later.",
   },
 });
 
@@ -161,44 +193,26 @@ app.use("/api/health", healthRoutes);
    AUTH ROUTES
 ========================================================= */
 
-/*
- * Rate-limit registration.
- */
-app.use(
-  "/api/auth/register",
-  authLimiter
-);
-
-/*
- * Rate-limit login.
- */
-app.use(
-  "/api/auth/login",
-  authLimiter
-);
-
-/*
- * Main authentication routes.
- *
- * Expected endpoints:
- *
- * POST /api/auth/register
- * POST /api/auth/login
- * GET  /api/auth/me
- */
-app.use(
-  "/api/auth",
-  authRoutes
-);
+app.use("/api/auth/register", authLimiter);
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth", authRoutes);
 
 /* =========================================================
-   ANALYSIS ROUTES
+   ANALYSIS ROUTES (✅ NEW: with rate limiter)
 ========================================================= */
 
-app.use(
-  "/api/analyses",
-  analysisRoutes
-);
+app.use("/api/analyses", analysesLimiter, analysisRoutes);
+
+/* =========================================================
+   ✅ REQUEST LOGGING (for debugging)
+========================================================= */
+
+if (isDevelopment) {
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
+  });
+}
 
 /* =========================================================
    404 HANDLER
