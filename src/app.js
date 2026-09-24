@@ -27,7 +27,7 @@ const isDevelopment =
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://resume-front-end-ebon.vercel.app",
+  "https://resume-front-7sdusn3v7-abdur-rahman7.vercel.app",
 ];
 
 /*
