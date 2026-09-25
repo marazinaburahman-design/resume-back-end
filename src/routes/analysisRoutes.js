@@ -1,28 +1,42 @@
 const express = require("express");
-const { analyzeResume } = require("../services/aiService");
+
+const {
+  createAnalysisFromText,
+  getAnalyses,
+  getAnalysisById,
+  deleteAnalysis,
+} = require("../controllers/analysisController");
+
+const protect = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.post("/", async (req, res) => {
-  try {
-    // Accept resume text directly (skip PDF extraction)
-    const { resumeText, jobTitle } = req.body;
+// CREATE ANALYSIS
+router.post(
+  "/",
+  protect,
+  createAnalysisFromText
+);
 
-    if (!resumeText || !jobTitle) {
-      return res.status(400).json({
-        message: "resumeText and jobTitle are required",
-      });
-    }
+// GET ALL ANALYSES
+router.get(
+  "/",
+  protect,
+  getAnalyses
+);
 
-    const analysis = await analyzeResume({ 
-      resumeText: resumeText.trim(), 
-      jobTitle 
-    });
+// GET ONE ANALYSIS
+router.get(
+  "/:id",
+  protect,
+  getAnalysisById
+);
 
-    res.json(analysis);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+// DELETE ANALYSIS
+router.delete(
+  "/:id",
+  protect,
+  deleteAnalysis
+);
 
 module.exports = router;
